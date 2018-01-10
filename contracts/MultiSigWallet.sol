@@ -1,4 +1,4 @@
-pragma solidity 0.4.15;
+pragma solidity 0.4.18;
 
 
 /// @title Multisignature wallet - Allows multiple parties to agree on transactions before execution.
@@ -93,6 +93,7 @@ contract MultiSigWallet {
 
     /// @dev Fallback function allows to deposit ether.
     function()
+    public
     payable
     {
         if (msg.value > 0)
