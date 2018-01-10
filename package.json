@@ -4,7 +4,16 @@
   "description": "OnLive Platform Wallet",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "run-s compile:ts compile:sol",
+    "compile:sol": "truffle compile",
+    "compile:ts": "tsc",
+    "test": "run-s compile:ts test:js",
+    "test:js": "truffle test",
+    "lint": "run-p -c --aggregate-output lint:solhint lint:tslint",
+    "lint:tslint": "tslint --project .",
+    "lint:tslint:fix": "tslint --fix --project .",
+    "lint:solhint": "solhint contracts/**/*.sol test/**/*.sol build/flat/**/*.sol",
+    "format": "prettier --write *.ts **/*.ts"
   },
   "repository": {
     "type": "git",
@@ -17,7 +26,15 @@
   },
   "homepage": "https://github.com/OnLivePlatform/onlive-wallet#readme",
   "devDependencies": {
+    "@types/chai": "^4.1.0",
+    "@types/mocha": "^2.2.46",
+    "@types/node": "^9.3.0",
+    "bignumber.js": "^5.0.0",
+    "npm-run-all": "^4.1.2",
+    "prettier": "^1.10.1",
     "solhint": "^1.1.9",
-    "truffle": "^4.0.4"
+    "truffle": "^4.0.4",
+    "tslint": "^5.8.0",
+    "typescript": "^2.6.2"
   }
 }
