@@ -1,0 +1,19 @@
+{
+  "name": "onlive-wallet",
+  "version": "1.0.0",
+  "description": "OnLive Platform Wallet",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OnLivePlatform/onlive-wallet.git"
+  },
+  "author": "Wojciech Harzowski",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/OnLivePlatform/onlive-wallet/issues"
+  },
+  "homepage": "https://github.com/OnLivePlatform/onlive-wallet#readme"
+}
