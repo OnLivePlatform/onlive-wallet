@@ -31,11 +31,52 @@ declare module 'wallet' {
         options?: TransactionOptions
       ): Promise<TransactionResult>;
 
+      submitTransaction(
+        destination: Address,
+        value: AnyNumber,
+        data: string,
+        options?: TransactionOptions
+      ): Promise<TransactionResult>;
+
+      confirmTransaction(
+        transactionId: AnyNumber,
+        options?: TransactionOptions
+      ): Promise<TransactionResult>;
+
+      executeTransaction(
+        transactionId: AnyNumber,
+        options?: TransactionOptions
+      ): Promise<TransactionResult>;
+
+      getTransationCount(
+        pending: boolean,
+        executed: boolean
+      ): Promise<AnyNumber>;
+
+      getTransactionIds(
+        from: AnyNumber,
+        to: AnyNumber,
+        pending: boolean,
+        executed: boolean
+      ): Promise<AnyNumber[]>;
+
       getOwners(): Promise<Address[]>;
     }
 
+    interface ConfirmationEvent {
+      sender: Address;
+      transactionId: AnyNumber;
+    }
+    interface ExecutionEvent {
+      transactionId: AnyNumber;
+    }
+
+    interface SubmissionEvent {
+      transactionId: AnyNumber;
+    }
+
     interface OwnerAdditionEvent {
-      addr: Address;
+      owner: Address;
     }
 
     interface MigrationsContract extends Contract<Migrations> {

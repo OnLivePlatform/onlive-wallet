@@ -3,6 +3,7 @@ import * as Web3 from 'web3';
 import { assert } from 'chai';
 import { findLast, propEq } from 'ramda';
 import { Method, TransactionLog, TransactionResult } from 'truffle';
+import { MultiSigWallet } from 'wallet';
 
 declare const web3: Web3;
 
