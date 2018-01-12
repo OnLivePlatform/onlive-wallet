@@ -91,15 +91,6 @@ contract MultiSigWallet {
         _;
     }
 
-    /// @dev Fallback function allows to deposit ether.
-    function()
-        public
-        payable
-    {
-        if (msg.value > 0)
-            Deposit(msg.sender, msg.value);
-    }
-
     /*
      * Public functions
      */
@@ -113,12 +104,21 @@ contract MultiSigWallet {
         public
         validRequirement(_owners.length, _required)
     {
-        for (uint i=0; i<_owners.length; i++) {
+        for (uint i=0; i < _owners.length; i++) {
             require(!isOwner[_owners[i]] && _owners[i] != 0);
             isOwner[_owners[i]] = true;
         }
         owners = _owners;
         required = _required;
+    }
+
+    /// @dev Fallback function allows to deposit ether.
+    function()
+        public
+        payable
+    {
+        if (msg.value > 0)
+            Deposit(msg.sender, msg.value);
     }
 
     /// @dev Allows to add a new owner. Transaction has to be sent by wallet.
@@ -143,7 +143,7 @@ contract MultiSigWallet {
         ownerExists(owner)
     {
         isOwner[owner] = false;
-        for (uint i=0; i<owners.length - 1; i++)
+        for (uint i=0; i < owners.length - 1; i++)
             if (owners[i] == owner) {
                 owners[i] = owners[owners.length - 1];
                 break;
@@ -166,7 +166,7 @@ contract MultiSigWallet {
         ownerExists(owner)
         ownerDoesNotExist(newOwner)
     {
-        for (uint i=0; i<owners.length; i++)
+        for (uint i=0; i < owners.length; i++)
             if (owners[i] == owner) {
                 owners[i] = newOwner;
                 break;
@@ -241,7 +241,7 @@ contract MultiSigWallet {
         if (isConfirmed(transactionId)) {
             Transaction storage txn = transactions[transactionId];
             txn.executed = true;
-            if (txn.destination.call.value(txn.value)(txn.data))
+            if (txn.destination.call.value(txn.value)(txn.data)) // solhint-disable
                 Execution(transactionId);
             else {
                 ExecutionFailure(transactionId);
@@ -259,40 +259,12 @@ contract MultiSigWallet {
         returns (bool)
     {
         uint count = 0;
-        for (uint i=0; i<owners.length; i++) {
+        for (uint i=0; i < owners.length; i++) {
             if (confirmations[transactionId][owners[i]])
                 count += 1;
             if (count == required)
                 return true;
         }
-    }
-
-    /*
-     * Internal functions
-     */
-    /// @dev Adds a new transaction to the transaction mapping, if transaction does not exist yet.
-    /// @param destination Transaction target address.
-    /// @param value Transaction ether value.
-    /// @param data Transaction data payload.
-    /// @return Returns transaction ID.
-    function addTransaction(
-        address destination,
-        uint value,
-        bytes data
-    )
-        internal
-        notNull(destination)
-        returns (uint transactionId)
-    {
-        transactionId = transactionCount;
-        transactions[transactionId] = Transaction({
-            destination: destination,
-            value: value,
-            data: data,
-            executed: false
-            });
-        transactionCount += 1;
-        Submission(transactionId);
     }
 
     /*
@@ -306,7 +278,7 @@ contract MultiSigWallet {
         constant
         returns (uint count)
     {
-        for (uint i=0; i<owners.length; i++)
+        for (uint i=0; i < owners.length; i++)
             if (confirmations[transactionId][owners[i]])
                 count += 1;
     }
@@ -323,8 +295,8 @@ contract MultiSigWallet {
         constant
         returns (uint count)
     {
-        for (uint i=0; i<transactionCount; i++)
-            if (   pending && !transactions[i].executed
+        for (uint i=0; i < transactionCount; i++)
+            if (pending && !transactions[i].executed
             || executed && transactions[i].executed)
                 count += 1;
     }
@@ -350,13 +322,13 @@ contract MultiSigWallet {
         address[] memory confirmationsTemp = new address[](owners.length);
         uint count = 0;
         uint i;
-        for (i=0; i<owners.length; i++)
+        for (i = 0; i < owners.length; i++)
             if (confirmations[transactionId][owners[i]]) {
                 confirmationsTemp[count] = owners[i];
                 count += 1;
             }
         _confirmations = new address[](count);
-        for (i=0; i<count; i++)
+        for (i = 0; i < count; i++)
             _confirmations[i] = confirmationsTemp[i];
     }
 
@@ -379,15 +351,42 @@ contract MultiSigWallet {
         uint[] memory transactionIdsTemp = new uint[](transactionCount);
         uint count = 0;
         uint i;
-        for (i=0; i<transactionCount; i++)
-            if (   pending && !transactions[i].executed
-            || executed && transactions[i].executed)
-            {
+        for (i = 0; i < transactionCount; i++)
+            if (pending && !transactions[i].executed
+            || executed && transactions[i].executed) {
                 transactionIdsTemp[count] = i;
                 count += 1;
             }
         _transactionIds = new uint[](to - from);
-        for (i=from; i<to; i++)
+        for (i = from; i < to; i++)
             _transactionIds[i - from] = transactionIdsTemp[i];
+    }
+
+    /*
+     * Internal functions
+     */
+    /// @dev Adds a new transaction to the transaction mapping, if transaction does not exist yet.
+    /// @param destination Transaction target address.
+    /// @param value Transaction ether value.
+    /// @param data Transaction data payload.
+    /// @return Returns transaction ID.
+    function addTransaction(
+        address destination,
+        uint value,
+        bytes data
+    )
+        internal
+        notNull(destination)
+        returns (uint transactionId)
+    {
+        transactionId = transactionCount;
+        transactions[transactionId] = Transaction({
+            destination: destination,
+            value: value,
+            data: data,
+            executed: false
+        });
+        transactionCount += 1;
+        Submission(transactionId);
     }
 }

@@ -1,5 +1,5 @@
-import { WalletArtifacts } from 'wallet';
 import { Deployer } from 'truffle';
+import { WalletArtifacts } from 'wallet';
 
 declare const artifacts: WalletArtifacts;
 

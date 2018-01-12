@@ -6,8 +6,8 @@ import * as Web3 from 'web3';
 
 import { MultiSigWallet, OwnerAdditionEvent, WalletArtifacts } from 'wallet';
 
-import { assertReverts, findLastLog } from './helpers';
 import { MultiSigWalletTestContext } from './context';
+import { assertReverts, findLastLog } from './helpers';
 
 declare const web3: Web3;
 declare const artifacts: WalletArtifacts;
