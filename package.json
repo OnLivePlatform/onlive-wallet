@@ -40,5 +40,7 @@
     "tslint": "^5.8.0",
     "typescript": "^2.6.2"
   },
-  "dependencies": {}
+  "dependencies": {
+    "zeppelin-solidity": "^1.5.0"
+  }
 }
