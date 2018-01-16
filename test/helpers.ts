@@ -44,3 +44,51 @@ export async function getData(func: any, ...args: any[]): Promise<string> {
   const [param] = request.params;
   return param.data;
 }
+
+export function findLastTransactionId(tx: TransactionResult) {
+  const log = findLastLog(tx, 'Submission');
+  assert.isOk(log);
+
+  const paramName = 'transactionId';
+  const transactionId = log.args[paramName] as Web3.AnyNumber;
+  assert.isOk(transactionId);
+
+  return transactionId;
+}
+
+export function findNewRequirement(tx: TransactionResult) {
+  const log = findLastLog(tx, 'RequirementChange');
+  assert.isOk(log);
+
+  const paramName = 'required';
+  const newRequired = log.args[paramName] as Web3.AnyNumber;
+  assert.isOk(newRequired);
+
+  return newRequired;
+}
+
+export async function deployWalletFunction(
+  wallet: MultiSigWallet,
+  func: any,
+  from: Address,
+  ...args: any[]
+): Promise<TransactionResult> {
+  const method = (func as any) as Method;
+  const owners = await wallet.getOwners();
+  let tx: TransactionResult;
+
+  tx = await wallet.submitTransaction(
+    wallet.address,
+    0,
+    await getData(method, ...args),
+    { from }
+  );
+  assert.isOk(tx);
+
+  const transactionId = findLastTransactionId(tx);
+  for (let i = 1; i < owners.length; i++) {
+    tx = await wallet.confirmTransaction(transactionId, { from: owners[i] });
+    assert.isOk(tx);
+  }
+  return tx;
+}

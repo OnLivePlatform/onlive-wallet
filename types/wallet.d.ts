@@ -24,10 +24,26 @@ declare module 'wallet' {
 
     interface MultiSigWallet extends ContractBase {
       owners(): Promise<Address[]>;
-      required(): Promise<number>;
+      required(): AnyNumber;
 
       addOwner(
         owner: Address,
+        options?: TransactionOptions
+      ): Promise<TransactionResult>;
+
+      removeOwner(
+        owner: Address,
+        options?: TransactionOptions
+      ): Promise<TransactionResult>;
+
+      replaceOwner(
+        owner: Address,
+        newOwner: Address,
+        options?: TransactionOptions
+      ): Promise<TransactionResult>;
+
+      changeRequirement(
+        required: AnyNumber,
         options?: TransactionOptions
       ): Promise<TransactionResult>;
 
@@ -43,15 +59,26 @@ declare module 'wallet' {
         options?: TransactionOptions
       ): Promise<TransactionResult>;
 
+      revokeConfirmation(
+        transactionId: AnyNumber,
+        options?: TransactionOptions
+      ): Promise<TransactionResult>;
+
       executeTransaction(
         transactionId: AnyNumber,
         options?: TransactionOptions
       ): Promise<TransactionResult>;
 
-      getTransationCount(
+      getConfirmationCount(transactionId: AnyNumber): Promise<AnyNumber>;
+
+      getTransactionCount(
         pending: boolean,
         executed: boolean
       ): Promise<AnyNumber>;
+
+      getOwners(): Promise<Address[]>;
+
+      getConfirmations(transactionId: AnyNumber): Promise<Address[]>;
 
       getTransactionIds(
         from: AnyNumber,
@@ -59,15 +86,22 @@ declare module 'wallet' {
         pending: boolean,
         executed: boolean
       ): Promise<AnyNumber[]>;
-
-      getOwners(): Promise<Address[]>;
     }
 
     interface ConfirmationEvent {
       sender: Address;
       transactionId: AnyNumber;
     }
+    interface RevocationEvent {
+      sender: Address;
+      transactionId: AnyNumber;
+    }
+
     interface ExecutionEvent {
+      transactionId: AnyNumber;
+    }
+
+    interface ExecutionFailureEvent {
       transactionId: AnyNumber;
     }
 
@@ -77,6 +111,14 @@ declare module 'wallet' {
 
     interface OwnerAdditionEvent {
       owner: Address;
+    }
+
+    interface OwnerRemovalEvent {
+      owner: Address;
+    }
+
+    interface RequirementChangeEvent {
+      transactionId: AnyNumber;
     }
 
     interface MigrationsContract extends Contract<Migrations> {
