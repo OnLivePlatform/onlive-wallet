@@ -1,0 +1,23 @@
+<div class="modal-header">
+  <h3 class="modal-title">
+    Confirm offline
+  </h3>
+</div>
+<div class="modal-body">
+  <div class="form-group">
+    <label for="gasLimit">Gas Limit</label>
+    <input type="text" class="form-control" ng-model="gasLimit" id="gasLimit" />
+  </div>
+  <div class="form-group">
+    <label for="confirmationData">Data</label>
+    <textarea type="text" rows="5" class="form-control" ng-model="confirmationData" id="confirmationData"></textarea>
+  </div>
+</div>
+<div class="modal-footer">
+  <button class="btn btn-default" ngclipboard-success="copy()" ngclipboard data-clipboard-target="#confirmationData">
+    Copy
+  </button>
+  <button class="btn btn-danger" ng-click="cancel()">
+    Cancel
+  </button>
+</div>

@@ -52,6 +52,12 @@
               show-hide-by-connectivity="online">
               Replace
             </button>
+            <button type="button" ng-click="getNonce(owner)"
+              class="btn btn-default btn-sm"
+              disabled-if-no-accounts
+              show-hide-by-connectivity="online">
+              Get nonce
+            </button>
             <button type="button" ng-click="removeOwner(owner)"
               class="btn btn-danger btn-sm"
               disabled-if-no-accounts
@@ -255,7 +261,7 @@
                 </li>
               </ul>
             </div>
-            <div ng-hide="transactions[txId].executed || transactions[txId].confirmed" ng-class="{'col-md-12' : !transactions[txId].confirmations.length, 'col-md-6' : transactions[txId].confirmations.length}">
+            <div ng-hide="transactions[txId].executed || transactions[txId].confirmed" ng-class="{'col-md-12' : !transactions[txId].confirmations.length, 'col-md-3' : transactions[txId].confirmations.length}">
               <button type="button" class="btn btn-default btn-sm pull-right"
                 ng-hide="transactions[txId].executed || transactions[txId].confirmed"
                 ng-click="confirmTransaction(txId)"
@@ -264,13 +270,22 @@
                 Confirm
               </button>
             </div>
-            <div class="col-md-6" ng-show="transactions[txId].confirmed && !transactions[txId].executed">
+            <div class="col-md-3" ng-show="transactions[txId].confirmed && !transactions[txId].executed">
               <button type="button" class="btn btn-default btn-sm pull-right"
                   ng-show="transactions[txId].confirmed && !transactions[txId].executed"
                   ng-click="revokeConfirmation(txId)"
                   disabled-if-no-accounts
                   show-hide-by-connectivity="online">
                 Revoke confirmation
+              </button>
+            </div>
+            <div class="col-md-3" ng-show="!transactions[txId].executed">
+              <button type="button" class="btn btn-default btn-sm pull-right"
+                      ng-show="!transactions[txId].executed"
+                      ng-click="getConfirmationData(txId)"
+                      disabled-if-no-accounts
+                      show-hide-by-connectivity="online">
+                Confirm offline
               </button>
             </div>
           </div>
