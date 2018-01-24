@@ -1,9 +1,16 @@
 import * as Web3 from 'web3';
 
+import BigNumber from 'bignumber.js';
 import { assert } from 'chai';
 import { findLast, propEq } from 'ramda';
-import { Method, TransactionLog, TransactionResult } from 'truffle';
-import { MultiSigWallet } from 'wallet';
+import {
+  Method,
+  TransactionLog,
+  TransactionOptions,
+  TransactionResult
+} from 'truffle';
+import { MultiSigWallet, SubmissionEvent } from 'wallet';
+import { AnyNumber } from 'web3';
 
 declare const web3: Web3;
 
@@ -31,6 +38,25 @@ export function assertRevertError(error: { message: string }) {
   }
 }
 
+export function assertNumberEqual(
+  actual: Web3.AnyNumber,
+  expect: Web3.AnyNumber,
+  decimals: number = 0
+) {
+  const actualNum = new BigNumber(actual);
+  const expectNum = new BigNumber(expect);
+
+  if (!actualNum.eq(expectNum)) {
+    const div = decimals ? Math.pow(10, decimals) : 1;
+    assert.fail(
+      actualNum.toFixed(),
+      expectNum.toFixed(),
+      `${actualNum.div(div).toFixed()} == ${expectNum.div(div).toFixed()}`,
+      '=='
+    );
+  }
+}
+
 export function findLastLog(
   trans: TransactionResult,
   event: string
@@ -39,7 +65,7 @@ export function findLastLog(
 }
 
 export async function getData(func: any, ...args: any[]): Promise<string> {
-  const method = (func as any) as Method;
+  const method = func as Method;
   const request = await method.request(...args);
   const [param] = request.params;
   return param.data;
@@ -49,46 +75,47 @@ export function findLastTransactionId(tx: TransactionResult) {
   const log = findLastLog(tx, 'Submission');
   assert.isOk(log);
 
-  const paramName = 'transactionId';
-  const transactionId = log.args[paramName] as Web3.AnyNumber;
-  assert.isOk(transactionId);
-
-  return transactionId;
+  const event = log.args as SubmissionEvent;
+  return event.transactionId;
 }
 
-export function findNewRequirement(tx: TransactionResult) {
-  const log = findLastLog(tx, 'RequirementChange');
-  assert.isOk(log);
-
-  const paramName = 'required';
-  const newRequired = log.args[paramName] as Web3.AnyNumber;
-  assert.isOk(newRequired);
-
-  return newRequired;
+export interface ExecutionResult {
+  transactionId: AnyNumber;
+  lastTransaction: TransactionResult;
 }
 
-export async function deployWalletFunction(
+export async function executeFunction(
+  wallet: MultiSigWallet,
+  to: Address,
+  value: Web3.AnyNumber,
+  data: string,
+  options: TransactionOptions
+): Promise<ExecutionResult> {
+  const owners = await wallet.getOwners();
+  let tx: TransactionResult;
+
+  tx = await wallet.submitTransaction(to, value, data, options);
+
+  const transactionId = findLastTransactionId(tx);
+
+  for (let i = 1; i < owners.length; i++) {
+    tx = await wallet.confirmTransaction(transactionId, { from: owners[i] });
+  }
+
+  // return last transaction, because it contains Execution events
+  return { transactionId, lastTransaction: tx } as ExecutionResult;
+}
+
+export async function executeWalletFunction(
   wallet: MultiSigWallet,
   func: any,
   from: Address,
   ...args: any[]
-): Promise<TransactionResult> {
-  const method = (func as any) as Method;
-  const owners = await wallet.getOwners();
-  let tx: TransactionResult;
+): Promise<ExecutionResult> {
+  const method = func as Method;
+  const options = { from };
 
-  tx = await wallet.submitTransaction(
-    wallet.address,
-    0,
-    await getData(method, ...args),
-    { from }
-  );
-  assert.isOk(tx);
+  const functionData = await getData(method, ...args);
 
-  const transactionId = findLastTransactionId(tx);
-  for (let i = 1; i < owners.length; i++) {
-    tx = await wallet.confirmTransaction(transactionId, { from: owners[i] });
-    assert.isOk(tx);
-  }
-  return tx;
+  return executeFunction(wallet, wallet.address, 0, functionData, options);
 }

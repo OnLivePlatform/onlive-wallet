@@ -1,11 +1,7 @@
 import { assert } from 'chai';
+import { propOr } from 'ramda';
 
-import {
-  ContractContextDefinition,
-  Method,
-  TransactionLog,
-  TransactionResult
-} from 'truffle';
+import { ContractContextDefinition } from 'truffle';
 import * as Web3 from 'web3';
 
 import {
@@ -22,13 +18,15 @@ import {
 } from 'wallet';
 
 import {
+  assertNumberEqual,
   assertReverts,
-  deployWalletFunction,
+  executeWalletFunction,
   findLastLog,
   findLastTransactionId,
-  findNewRequirement,
   getData
 } from './helpers';
+
+import { AnyNumber } from 'web3';
 
 declare const web3: Web3;
 declare const artifacts: WalletArtifacts;
@@ -37,22 +35,90 @@ declare const contract: ContractContextDefinition;
 const MultiSigWalletContract = artifacts.require('MultiSigWallet');
 
 contract('MultiSigWallet', accounts => {
-  const owners = [accounts[0], accounts[1], accounts[2]];
+  const owners = accounts.slice(0, 3);
   const required = 3;
 
   let wallet: MultiSigWallet;
+
+  async function submitAddOwner(options?: any) {
+    const data = await getData(
+      wallet.addOwner,
+      propOr(owners[0], 'newOwner', options)
+    );
+    return await wallet.submitTransaction(
+      propOr(wallet.address, 'to', options),
+      propOr(0, 'value', options),
+      data,
+      { from: propOr(owners[0], 'from', options) }
+    );
+  }
+
+  async function executeChangeRequirements(
+    newRequirements: AnyNumber,
+    options?: any
+  ) {
+    return await executeWalletFunction(
+      propOr(wallet, 'wallet', options),
+      wallet.changeRequirement,
+      propOr(owners[0], 'from', options),
+      newRequirements
+    );
+  }
+
+  async function executeReplaceOwner(
+    oldOwner: Address,
+    newOwner: Address,
+    options?: any
+  ) {
+    return await executeWalletFunction(
+      propOr(wallet, 'wallet', options),
+      wallet.replaceOwner,
+      propOr(owners[0], 'from', options),
+      oldOwner,
+      newOwner
+    );
+  }
+
+  async function executeRemoveOwner(owner: Address, options?: any) {
+    return await executeWalletFunction(
+      propOr(wallet, 'wallet', options),
+      wallet.removeOwner,
+      propOr(owners[0], 'from', options),
+      owner
+    );
+  }
+
+  async function executeAddOwner(newOwner: Address, options?: any) {
+    return await executeWalletFunction(
+      propOr(wallet, 'wallet', options),
+      wallet.addOwner,
+      propOr(owners[0], 'from', options),
+      newOwner
+    );
+  }
 
   beforeEach(async () => {
     wallet = await MultiSigWalletContract.new(owners, required, {
       from: owners[0]
     });
-    assert.isOk(wallet);
   });
 
   describe('#ctor', () => {
+    it('should set required', async () => {
+      assertNumberEqual(await wallet.required(), required);
+    });
+
+    it('should set owners', async () => {
+      assert.deepEqual(await wallet.getOwners(), owners);
+    });
+
+    it('should not have any transactions', async () => {
+      assertNumberEqual(await wallet.getTransactionCount(true, true), 0);
+    });
+
     it('should revert for empty list of owners', async () => {
       await assertReverts(async () => {
-        await MultiSigWalletContract.new([], 0);
+        await MultiSigWalletContract.new([], 3);
       });
     });
 
@@ -61,520 +127,389 @@ contract('MultiSigWallet', accounts => {
         await MultiSigWalletContract.new(owners, 0);
       });
     });
-
-    it('should create wallet', async () => {
-      assert.ok(wallet);
-    });
-
-    it('should set required', async () => {
-      assert.equal(await wallet.required(), required);
-    });
-
-    it('should set owners', async () => {
-      assert.deepEqual(await wallet.getOwners(), owners);
-    });
-
-    it('should not have any transactions', async () => {
-      assert.equal(await wallet.getTransactionCount(true, true), 0);
-    });
   });
 
   describe('#submitTransaction', () => {
-    let tx: TransactionResult;
+    it('should emit SubmissionEvent', async () => {
+      const tx = await submitAddOwner({ from: accounts[0] });
 
-    context('with invalid data', async () => {
-      it('should revert for non-existing owner', async () => {
-        await assertReverts(async () => {
-          const data = await getData(wallet.addOwner, owners[0]);
-          await wallet.submitTransaction(wallet.address, 0, data, {
-            from: accounts[9]
-          });
-        });
-      });
+      const log = findLastLog(tx, 'Submission');
+      assert.isOk(log);
+
+      const event = log.args as SubmissionEvent;
+      assertNumberEqual(event.transactionId, 0);
     });
 
-    context('with valid data', async () => {
-      beforeEach(async () => {
-        const data = await getData(wallet.addOwner, owners[0]);
-        tx = await wallet.submitTransaction(wallet.address, 0, data, {
-          from: owners[0]
-        });
-      });
+    it('should store one pending transaction', async () => {
+      const tx = await submitAddOwner({ from: accounts[0] });
 
-      it('should emit SubmissionEvent', async () => {
-        const log = findLastLog(tx, 'Submission');
-        assert.isOk(log);
+      const transactionCount = await wallet.getTransactionCount(true, false);
 
-        const event = log.args as SubmissionEvent;
-        assert.isOk(event);
-      });
+      assertNumberEqual(transactionCount, 1);
 
-      it('should store one pending transaction', async () => {
-        const transactionCount = await wallet.getTransactionCount(true, false);
-        assert.equal(transactionCount, 1);
+      const transactionId = findLastTransactionId(tx);
 
-        const transactionId = findLastTransactionId(tx);
+      const transactionIds = await wallet.getTransactionIds(0, 1, true, false);
+      assert.deepEqual(transactionIds, [transactionId]);
+    });
 
-        const transactionIds = await wallet.getTransactionIds(
-          0,
-          1,
-          true,
-          false
-        );
-        assert.deepEqual(transactionIds, [transactionId]);
-      });
+    it('should set one valid confirmation for transaction', async () => {
+      const tx = await submitAddOwner({ from: accounts[0] });
 
-      it('should set one valid confirmation for transaction', async () => {
-        const transactionId = findLastTransactionId(tx);
+      const transactionId = findLastTransactionId(tx);
 
-        const confirmationCount = await wallet.getConfirmationCount(
-          transactionId
-        );
-        assert.equal(confirmationCount, 1);
+      const confirmationCount = await wallet.getConfirmationCount(
+        transactionId
+      );
 
-        const confirmations = await wallet.getConfirmations(transactionId);
-        assert.deepEqual(confirmations, [owners[0]]);
+      assertNumberEqual(confirmationCount, 1);
+
+      const confirmations = await wallet.getConfirmations(transactionId);
+      assert.deepEqual(confirmations, [owners[0]]);
+    });
+
+    it('should revert for non-owner', async () => {
+      await assertReverts(async () => {
+        await submitAddOwner({ from: accounts[9] });
       });
     });
   });
 
   describe('#confirmTransaction', () => {
-    let transactionId: Web3.AnyNumber;
-    let tx: TransactionResult;
+    let transactionId: AnyNumber;
 
     beforeEach(async () => {
-      transactionId = findLastTransactionId(
-        await wallet.submitTransaction(
-          wallet.address,
-          0,
-          await getData(wallet.addOwner, accounts[9]),
-          { from: owners[0] }
-        )
+      const tx = await submitAddOwner({ newOwner: accounts[9] });
+      transactionId = findLastTransactionId(tx);
+    });
+
+    it('should emit ConfirmationEvent', async () => {
+      const tx = await wallet.confirmTransaction(transactionId, {
+        from: owners[1]
+      });
+
+      const log = findLastLog(tx, 'Confirmation');
+      assert.isOk(log);
+
+      const event = log.args as ConfirmationEvent;
+      assert.equal(event.sender, owners[1]);
+      assertNumberEqual(event.transactionId, transactionId);
+    });
+
+    it('should set new valid confirmation for transaction', async () => {
+      await wallet.confirmTransaction(transactionId, { from: owners[1] });
+      const confirmationCount = await wallet.getConfirmationCount(
+        transactionId
       );
-      tx = await wallet.confirmTransaction(transactionId, { from: owners[1] });
+      assertNumberEqual(confirmationCount, 2);
+
+      const confirmations = await wallet.getConfirmations(transactionId);
+      assert.deepEqual(confirmations, [owners[0], owners[1]]);
     });
 
-    context('with invalid data', async () => {
-      it('should revert for non-existing owner', async () => {
-        await assertReverts(async () => {
-          await wallet.confirmTransaction(transactionId, { from: accounts[9] });
-        });
-      });
-
-      it('should revert for non-existing transaction', async () => {
-        await assertReverts(async () => {
-          await wallet.confirmTransaction(2, { from: owners[0] });
-        });
-      });
-
-      it('should revert for duplicated confirmation', async () => {
-        await assertReverts(async () => {
-          await wallet.confirmTransaction(transactionId, { from: owners[0] });
-        });
+    it('should revert for non-owner', async () => {
+      await assertReverts(async () => {
+        await wallet.confirmTransaction(transactionId, { from: accounts[9] });
       });
     });
 
-    context('with valid data', async () => {
-      it('should emit ConfirmationEvent', async () => {
-        const log = findLastLog(tx, 'Confirmation');
-        assert.isOk(log);
-
-        const event = log.args as ConfirmationEvent;
-        assert.isOk(event);
+    it('should revert for non-existing transaction', async () => {
+      await assertReverts(async () => {
+        await wallet.confirmTransaction(2, { from: owners[0] });
       });
+    });
 
-      it('should set new valid confirmation for transaction', async () => {
-        const confirmationCount = await wallet.getConfirmationCount(
-          transactionId
-        );
-        assert.equal(confirmationCount, 2);
-
-        const confirmations = await wallet.getConfirmations(transactionId);
-        assert.deepEqual(confirmations, [owners[0], owners[1]]);
+    it('should revert for duplicated confirmation', async () => {
+      await assertReverts(async () => {
+        await wallet.confirmTransaction(transactionId, { from: owners[0] });
       });
     });
   });
 
   describe('#revokeConfirmation', () => {
-    let transactionId: Web3.AnyNumber;
-    let tx: TransactionResult;
+    let transactionId: AnyNumber;
 
-    context('with invalid data', async () => {
-      it('should revert for non-existing owner', async () => {
-        await assertReverts(async () => {
-          await wallet.revokeConfirmation(1, { from: accounts[9] });
-        });
+    beforeEach(async () => {
+      const tx = await submitAddOwner({ newOwner: accounts[9] });
+      transactionId = findLastTransactionId(tx);
+    });
+
+    it('should emit RevocationEvent', async () => {
+      const tx = await wallet.revokeConfirmation(transactionId, {
+        from: owners[0]
       });
+      const log = findLastLog(tx, 'Revocation');
+      assert.isOk(log);
 
-      it('should revert for non-existing transaction', async () => {
-        await assertReverts(async () => {
-          await wallet.revokeConfirmation(2, { from: owners[0] });
-        });
+      const event = log.args as RevocationEvent;
+      assert.equal(event.sender, owners[0]);
+      assertNumberEqual(event.transactionId, transactionId);
+    });
+
+    it('should revoke confirmation for transaction', async () => {
+      await wallet.revokeConfirmation(transactionId, {
+        from: owners[0]
+      });
+      const confirmationCount = await wallet.getConfirmationCount(
+        transactionId
+      );
+      assertNumberEqual(confirmationCount, 0);
+    });
+
+    it('should revert for non-owner', async () => {
+      await assertReverts(async () => {
+        await wallet.revokeConfirmation(1, { from: accounts[9] });
       });
     });
 
-    context('with valid data', async () => {
-      beforeEach(async () => {
-        transactionId = findLastTransactionId(
-          await wallet.submitTransaction(
-            wallet.address,
-            0,
-            await getData(wallet.addOwner, accounts[9]),
-            { from: owners[0] }
-          )
-        );
-        tx = await wallet.revokeConfirmation(transactionId, {
-          from: owners[0]
-        });
+    it('should revert for non-existing transaction', async () => {
+      await assertReverts(async () => {
+        await wallet.revokeConfirmation(2, { from: owners[0] });
       });
+    });
 
-      it('should emit RevocationEvent', async () => {
-        const log = findLastLog(tx, 'Revocation');
-        assert.isOk(log);
-
-        const event = log.args as RevocationEvent;
-        assert.isOk(event);
-      });
-
-      it('should revoke confirmation for transaction', async () => {
-        const confirmationCount = await wallet.getConfirmationCount(
-          transactionId
-        );
-        assert.equal(confirmationCount, 0);
-      });
-
-      it('should revert for not confirmed transaction', async () => {
-        await assertReverts(async () => {
-          await wallet.revokeConfirmation(2, { from: owners[0] });
-        });
+    it('should revert for not confirmed transaction', async () => {
+      await assertReverts(async () => {
+        await wallet.revokeConfirmation(2, { from: owners[0] });
       });
     });
   });
 
   describe('#executeTransaction', () => {
-    let transactionId: Web3.AnyNumber;
-    let tx: TransactionResult;
+    let transactionId: AnyNumber;
 
-    context('with invalid data', async () => {
-      it('should revert for non-existing owner', async () => {
-        await assertReverts(async () => {
-          await wallet.executeTransaction(1, { from: accounts[9] });
-        });
+    beforeEach(async () => {
+      const tx = await submitAddOwner({ newOwner: accounts[9] });
+      transactionId = findLastTransactionId(tx);
+      await wallet.confirmTransaction(transactionId, { from: owners[1] });
+    });
+
+    it('should emit ExecutionEvent', async () => {
+      const tx = await wallet.confirmTransaction(transactionId, {
+        from: owners[2]
       });
 
-      it('should revert for non-existing transaction', async () => {
-        await assertReverts(async () => {
-          await wallet.executeTransaction(2, { from: owners[0] });
-        });
+      const log = findLastLog(tx, 'Execution');
+      assert.isOk(log);
+
+      const event = log.args as ExecutionEvent;
+      assertNumberEqual(event.transactionId, transactionId);
+    });
+
+    it('should set transaction as executed', async () => {
+      await wallet.confirmTransaction(transactionId, {
+        from: owners[2]
+      });
+
+      const transactionCount = await wallet.getTransactionCount(false, true);
+      assertNumberEqual(transactionCount, 1);
+
+      const transactionIds = await wallet.getTransactionIds(0, 1, false, true);
+      assert.deepEqual(transactionIds, [transactionId]);
+    });
+
+    it('should revert for non-owner', async () => {
+      await assertReverts(async () => {
+        await wallet.executeTransaction(transactionId, { from: accounts[9] });
       });
     });
 
-    context('with valid data', async () => {
-      beforeEach(async () => {
-        transactionId = findLastTransactionId(
-          await wallet.submitTransaction(
-            wallet.address,
-            0,
-            await getData(wallet.addOwner, accounts[9]),
-            { from: owners[0] }
-          )
-        );
+    it('should revert for non-existing transaction', async () => {
+      await assertReverts(async () => {
+        await wallet.executeTransaction(2, { from: owners[0] });
       });
+    });
 
-      it('should revert for not confirmed transaction', async () => {
-        await assertReverts(async () => {
-          await wallet.executeTransaction(transactionId, { from: owners[1] });
-        });
-      });
-
-      beforeEach(async () => {
-        await wallet.confirmTransaction(transactionId, { from: owners[1] });
-        tx = await wallet.confirmTransaction(transactionId, {
-          from: owners[2]
-        });
-      });
-
-      it('should emit ExecutionEvent', async () => {
-        const log = findLastLog(tx, 'Execution');
-        assert.isOk(log);
-
-        const event = log.args as ExecutionEvent;
-        assert.isOk(event);
-      });
-
-      it('should set transaction as executed', async () => {
-        const transactionCount = await wallet.getTransactionCount(false, true);
-        assert.equal(transactionCount, 1);
-
-        const transactionIds = await wallet.getTransactionIds(
-          0,
-          1,
-          false,
-          true
-        );
-        assert.deepEqual(transactionIds, [transactionId]);
+    it('should revert for not confirmed transaction', async () => {
+      await assertReverts(async () => {
+        await wallet.executeTransaction(transactionId, { from: owners[2] });
       });
     });
   });
 
   describe('#changeRequirement', () => {
-    let tx: TransactionResult;
     const newRequired = 2;
 
-    context('with invalid data', async () => {
-      it('should revert for not wallet', async () => {
-        await assertReverts(async () => {
-          await wallet.changeRequirement(newRequired);
-        });
-      });
+    it('should emit ExecutionFailureEvent for zero requirements', async () => {
+      const result = await executeChangeRequirements(0);
+      const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
+      assert.isOk(log);
 
-      it('should emit ExecutionFailureEvent for invalid requirements', async () => {
-        let log: TransactionLog;
-        let event: ExecutionFailureEvent;
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.changeRequirement,
-          owners[0],
-          0
-        );
-
-        log = findLastLog(tx, 'ExecutionFailure');
-        assert.isOk(log);
-        event = log.args;
-        assert.isOk(event);
-
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.changeRequirement,
-          owners[0],
-          4
-        );
-        log = findLastLog(tx, 'ExecutionFailure');
-        assert.isOk(log);
-        event = log.args;
-        assert.isOk(event);
-      });
+      const event = log.args;
+      assertNumberEqual(event.transactionId, result.transactionId);
     });
 
-    context('with valid data', async () => {
-      beforeEach(async () => {
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.changeRequirement,
-          owners[0],
-          newRequired
-        );
-      });
+    it('should emit ExecutionFailureEvent for requirements > owners count', async () => {
+      const result = await executeChangeRequirements(4);
+      const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
+      assert.isOk(log);
 
-      it('should emit RequirementChangeEvent', async () => {
-        const log = findLastLog(tx, 'RequirementChange');
-        assert.isOk(log);
-        const event = log.args as RequirementChangeEvent;
-        assert.isOk(event);
-      });
+      const event = log.args;
+      assertNumberEqual(event.transactionId, result.transactionId);
+    });
 
-      it('should change `required` attribute', async () => {
-        const walletRequired = findNewRequirement(tx);
-        assert.equal(walletRequired, newRequired);
+    it('should emit RequirementChangeEvent', async () => {
+      const result = await executeChangeRequirements(newRequired);
+      const log = findLastLog(result.lastTransaction, 'RequirementChange');
+      assert.isOk(log);
+
+      const event = log.args as RequirementChangeEvent;
+      assertNumberEqual(event.required, newRequired);
+    });
+
+    it('should change `required` attribute', async () => {
+      await executeChangeRequirements(newRequired);
+      assertNumberEqual(await wallet.required(), newRequired);
+    });
+
+    it('should revert for not wallet', async () => {
+      await assertReverts(async () => {
+        await wallet.changeRequirement(newRequired);
       });
     });
   });
 
   describe('#replaceOwner', () => {
-    let tx: TransactionResult;
     const oldOwner = owners[0];
     const newOwner = accounts[4];
 
-    context('with invalid data', async () => {
-      it('should revert for not wallet', async () => {
-        await assertReverts(async () => {
-          await wallet.replaceOwner(oldOwner, newOwner);
-        });
-      });
+    it('should emit ExecutionFailureEvent for non-owner', async () => {
+      const result = await executeReplaceOwner(newOwner, newOwner);
+      const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
+      assert.isOk(log);
 
-      it('should emit ExecutionFailureEvent for non-existing owner', async () => {
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.replaceOwner,
-          owners[0],
-          newOwner,
-          newOwner
-        );
-
-        const log = findLastLog(tx, 'ExecutionFailure');
-        assert.isOk(log);
-        const event = log.args as ExecutionFailureEvent;
-        assert.isOk(event);
-      });
-
-      it('should emit ExecutionFailureEvent for existing new owner', async () => {
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.replaceOwner,
-          owners[0],
-          oldOwner,
-          oldOwner
-        );
-
-        const log = findLastLog(tx, 'ExecutionFailure');
-        assert.isOk(log);
-        const event = log.args as ExecutionFailureEvent;
-        assert.isOk(event);
-      });
+      const event = log.args as ExecutionFailureEvent;
+      assertNumberEqual(event.transactionId, result.transactionId);
     });
 
-    context('with valid data', async () => {
-      beforeEach(async () => {
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.replaceOwner,
-          owners[0],
-          oldOwner,
-          newOwner
-        );
-      });
+    it('should emit ExecutionFailureEvent for existing new owner', async () => {
+      const result = await executeReplaceOwner(oldOwner, oldOwner);
+      const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
+      assert.isOk(log);
 
-      it('should emit OwnerRemovalEvent', async () => {
-        const log = findLastLog(tx, 'OwnerRemoval');
-        assert.isOk(log);
-        const event = log.args as OwnerRemovalEvent;
-        assert.isOk(event);
-      });
+      const event = log.args as ExecutionFailureEvent;
+      assertNumberEqual(event.transactionId, result.transactionId);
+    });
 
-      it('should emit OwnerAdditionEvent', async () => {
-        const log = findLastLog(tx, 'OwnerAddition');
-        assert.isOk(log);
-        const event = log.args as OwnerAdditionEvent;
-        assert.isOk(event);
-      });
+    it('should emit OwnerRemovalEvent', async () => {
+      const result = await executeReplaceOwner(oldOwner, newOwner);
+      const log = findLastLog(result.lastTransaction, 'OwnerRemoval');
+      assert.isOk(log);
 
-      it('should remove old owner', async () => {
-        assert.notInclude(await wallet.getOwners(), oldOwner);
-      });
+      const event = log.args as OwnerRemovalEvent;
+      assert.equal(event.owner, oldOwner);
+    });
 
-      it('should add new owner', async () => {
-        assert.deepEqual(await wallet.getOwners(), [
-          newOwner,
-          owners[1],
-          owners[2]
-        ]);
+    it('should emit OwnerAdditionEvent', async () => {
+      const result = await executeReplaceOwner(oldOwner, newOwner);
+      const log = findLastLog(result.lastTransaction, 'OwnerAddition');
+      assert.isOk(log);
+
+      const event = log.args as OwnerAdditionEvent;
+      assert.equal(event.owner, newOwner);
+    });
+
+    it('should remove old owner', async () => {
+      await executeReplaceOwner(oldOwner, newOwner);
+
+      assert.notInclude(await wallet.getOwners(), oldOwner);
+    });
+
+    it('should add new owner', async () => {
+      await executeReplaceOwner(oldOwner, newOwner);
+
+      assert.deepEqual(await wallet.getOwners(), [
+        newOwner,
+        owners[1],
+        owners[2]
+      ]);
+    });
+
+    it('should revert for not wallet', async () => {
+      await assertReverts(async () => {
+        await wallet.replaceOwner(oldOwner, newOwner);
       });
     });
   });
 
   describe('#removeOwner', () => {
-    let tx: TransactionResult;
     const ownerToRemove = owners[1];
 
-    context('with invalid data', async () => {
-      it('should revert for not wallet', async () => {
-        await assertReverts(async () => {
-          await wallet.removeOwner(ownerToRemove);
-        });
-      });
+    it('should emit ExecutionFailureEvent for non-owner', async () => {
+      const result = await executeRemoveOwner(accounts[4]);
+      const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
+      assert.isOk(log);
 
-      it('should emit ExecutionFailureEvent for non-existing owner', async () => {
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.removeOwner,
-          owners[0],
-          accounts[4]
-        );
-
-        const log = findLastLog(tx, 'ExecutionFailure');
-        assert.isOk(log);
-        const event = log.args as ExecutionFailureEvent;
-        assert.isOk(event);
-      });
+      const event = log.args as ExecutionFailureEvent;
+      assertNumberEqual(event.transactionId, result.transactionId);
     });
 
-    context('with valid data', async () => {
-      beforeEach(async () => {
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.removeOwner,
-          owners[0],
-          ownerToRemove
-        );
-      });
+    it('should emit OwnerRemovalEvent', async () => {
+      const result = await executeRemoveOwner(ownerToRemove);
+      const log = findLastLog(result.lastTransaction, 'OwnerRemoval');
+      assert.isOk(log);
 
-      it('should emit OwnerRemovalEvent', async () => {
-        const log = findLastLog(tx, 'OwnerRemoval');
-        assert.isOk(log);
-        const event = log.args as OwnerRemovalEvent;
-        assert.isOk(event);
-      });
+      const event = log.args as OwnerRemovalEvent;
+      assert.equal(event.owner, ownerToRemove);
+    });
 
-      it('should remove old owner', async () => {
-        assert.notInclude(await wallet.getOwners(), ownerToRemove);
+    it('should remove old owner', async () => {
+      await executeRemoveOwner(ownerToRemove);
+
+      assert.notInclude(await wallet.getOwners(), ownerToRemove);
+    });
+
+    it('should revert for not wallet', async () => {
+      await assertReverts(async () => {
+        await wallet.removeOwner(ownerToRemove);
       });
     });
   });
 
   describe('#addOwner', () => {
-    let tx: TransactionResult;
     const newOwner = accounts[4];
 
-    context('with invalid data', async () => {
-      it('should revert for not wallet', async () => {
-        await assertReverts(async () => {
-          await wallet.addOwner(newOwner);
-        });
-      });
+    it('should emit ExecutionFailureEvent for invalid address', async () => {
+      const result = await executeAddOwner('0x0');
+      const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
+      assert.isOk(log);
 
-      it('should emit ExecutionFailureEvent for invalid address', async () => {
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.addOwner,
-          owners[0],
-          '0'
-        );
-
-        const log = findLastLog(tx, 'ExecutionFailure');
-        assert.isOk(log);
-        const event = log.args as ExecutionFailureEvent;
-        assert.isOk(event);
-      });
-
-      it('should emit ExecutionFailureEvent for existing new owner', async () => {
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.addOwner,
-          owners[0],
-          owners[0]
-        );
-
-        const log = findLastLog(tx, 'ExecutionFailure');
-        assert.isOk(log);
-        const event = log.args as ExecutionFailureEvent;
-        assert.isOk(event);
-      });
+      const event = log.args as ExecutionFailureEvent;
+      assertNumberEqual(event.transactionId, result.transactionId);
     });
 
-    context('with valid data', async () => {
-      beforeEach(async () => {
-        tx = await deployWalletFunction(
-          wallet,
-          wallet.addOwner,
-          owners[0],
-          newOwner
-        );
-      });
+    it('should emit ExecutionFailureEvent for existing new owner', async () => {
+      const result = await executeAddOwner(owners[0]);
+      const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
+      assert.isOk(log);
 
-      it('should emit OwnerAdditionEvent', async () => {
-        const log = findLastLog(tx, 'OwnerAddition');
-        assert.isOk(log);
-        const event = log.args as OwnerAdditionEvent;
-        assert.isOk(event);
-      });
+      const event = log.args as ExecutionFailureEvent;
+      assertNumberEqual(event.transactionId, result.transactionId);
+    });
 
-      it('should add new owner', async () => {
-        assert.deepEqual(await wallet.getOwners(), [
-          owners[0],
-          owners[1],
-          owners[2],
-          newOwner
-        ]);
+    it('should emit OwnerAdditionEvent', async () => {
+      const result = await executeAddOwner(newOwner);
+      const log = findLastLog(result.lastTransaction, 'OwnerAddition');
+      assert.isOk(log);
+
+      const event = log.args as OwnerAdditionEvent;
+      assert.equal(event.owner, newOwner);
+    });
+
+    it('should add new owner', async () => {
+      await executeAddOwner(newOwner);
+
+      assert.deepEqual(await wallet.getOwners(), [
+        owners[0],
+        owners[1],
+        owners[2],
+        newOwner
+      ]);
+    });
+
+    it('should revert for not wallet', async () => {
+      await assertReverts(async () => {
+        await wallet.addOwner(newOwner);
       });
     });
   });

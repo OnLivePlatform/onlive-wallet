@@ -8,6 +8,7 @@ declare module 'wallet' {
     TruffleArtifacts
   } from 'truffle';
   import { AnyNumber } from 'web3';
+  import BigNumber from 'bignumber.js';
 
   namespace wallet {
     interface Migrations extends ContractBase {
@@ -23,8 +24,8 @@ declare module 'wallet' {
     }
 
     interface MultiSigWallet extends ContractBase {
-      owners(): Promise<Address[]>;
-      required(): AnyNumber;
+      owners(num: AnyNumber): Promise<Address[]>;
+      required(): Promise<BigNumber>;
 
       addOwner(
         owner: Address,
@@ -69,12 +70,12 @@ declare module 'wallet' {
         options?: TransactionOptions
       ): Promise<TransactionResult>;
 
-      getConfirmationCount(transactionId: AnyNumber): Promise<AnyNumber>;
+      getConfirmationCount(transactionId: AnyNumber): Promise<BigNumber>;
 
       getTransactionCount(
         pending: boolean,
         executed: boolean
-      ): Promise<AnyNumber>;
+      ): Promise<BigNumber>;
 
       getOwners(): Promise<Address[]>;
 
@@ -118,7 +119,7 @@ declare module 'wallet' {
     }
 
     interface RequirementChangeEvent {
-      transactionId: AnyNumber;
+      required: AnyNumber;
     }
 
     interface MigrationsContract extends Contract<Migrations> {
