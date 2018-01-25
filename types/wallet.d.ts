@@ -1,4 +1,5 @@
 declare module 'wallet' {
+  import { BigNumber } from 'bignumber.js';
   import {
     AnyContract,
     Contract,
@@ -8,7 +9,6 @@ declare module 'wallet' {
     TruffleArtifacts
   } from 'truffle';
   import { AnyNumber } from 'web3';
-  import BigNumber from 'bignumber.js';
 
   namespace wallet {
     interface Migrations extends ContractBase {
@@ -91,23 +91,23 @@ declare module 'wallet' {
 
     interface ConfirmationEvent {
       sender: Address;
-      transactionId: AnyNumber;
+      transactionId: BigNumber;
     }
     interface RevocationEvent {
       sender: Address;
-      transactionId: AnyNumber;
+      transactionId: BigNumber;
     }
 
     interface ExecutionEvent {
-      transactionId: AnyNumber;
+      transactionId: BigNumber;
     }
 
     interface ExecutionFailureEvent {
-      transactionId: AnyNumber;
+      transactionId: BigNumber;
     }
 
     interface SubmissionEvent {
-      transactionId: AnyNumber;
+      transactionId: BigNumber;
     }
 
     interface OwnerAdditionEvent {
@@ -119,7 +119,7 @@ declare module 'wallet' {
     }
 
     interface RequirementChangeEvent {
-      required: AnyNumber;
+      required: BigNumber;
     }
 
     interface MigrationsContract extends Contract<Migrations> {

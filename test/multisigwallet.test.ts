@@ -1,3 +1,4 @@
+import { BigNumber } from 'bignumber.js';
 import { assert } from 'chai';
 import { propOr } from 'ramda';
 
@@ -122,7 +123,7 @@ contract('MultiSigWallet', accounts => {
       });
     });
 
-    it('should revert for zero required', async () => {
+    it('should revert for zero requirement', async () => {
       await assertReverts(async () => {
         await MultiSigWalletContract.new(owners, 0);
       });
@@ -132,7 +133,6 @@ contract('MultiSigWallet', accounts => {
   describe('#submitTransaction', () => {
     it('should emit SubmissionEvent', async () => {
       const tx = await submitAddOwner({ from: accounts[0] });
-
       const log = findLastLog(tx, 'Submission');
       assert.isOk(log);
 
@@ -142,22 +142,18 @@ contract('MultiSigWallet', accounts => {
 
     it('should store one pending transaction', async () => {
       const tx = await submitAddOwner({ from: accounts[0] });
-
       const transactionCount = await wallet.getTransactionCount(true, false);
 
       assertNumberEqual(transactionCount, 1);
 
       const transactionId = findLastTransactionId(tx);
-
       const transactionIds = await wallet.getTransactionIds(0, 1, true, false);
       assert.deepEqual(transactionIds, [transactionId]);
     });
 
     it('should set one valid confirmation for transaction', async () => {
       const tx = await submitAddOwner({ from: accounts[0] });
-
       const transactionId = findLastTransactionId(tx);
-
       const confirmationCount = await wallet.getConfirmationCount(
         transactionId
       );
@@ -176,7 +172,7 @@ contract('MultiSigWallet', accounts => {
   });
 
   describe('#confirmTransaction', () => {
-    let transactionId: AnyNumber;
+    let transactionId: BigNumber;
 
     beforeEach(async () => {
       const tx = await submitAddOwner({ newOwner: accounts[9] });
@@ -201,6 +197,7 @@ contract('MultiSigWallet', accounts => {
       const confirmationCount = await wallet.getConfirmationCount(
         transactionId
       );
+
       assertNumberEqual(confirmationCount, 2);
 
       const confirmations = await wallet.getConfirmations(transactionId);
@@ -227,7 +224,7 @@ contract('MultiSigWallet', accounts => {
   });
 
   describe('#revokeConfirmation', () => {
-    let transactionId: AnyNumber;
+    let transactionId: BigNumber;
 
     beforeEach(async () => {
       const tx = await submitAddOwner({ newOwner: accounts[9] });
@@ -238,6 +235,7 @@ contract('MultiSigWallet', accounts => {
       const tx = await wallet.revokeConfirmation(transactionId, {
         from: owners[0]
       });
+
       const log = findLastLog(tx, 'Revocation');
       assert.isOk(log);
 
@@ -250,9 +248,11 @@ contract('MultiSigWallet', accounts => {
       await wallet.revokeConfirmation(transactionId, {
         from: owners[0]
       });
+
       const confirmationCount = await wallet.getConfirmationCount(
         transactionId
       );
+
       assertNumberEqual(confirmationCount, 0);
     });
 
@@ -276,7 +276,7 @@ contract('MultiSigWallet', accounts => {
   });
 
   describe('#executeTransaction', () => {
-    let transactionId: AnyNumber;
+    let transactionId: BigNumber;
 
     beforeEach(async () => {
       const tx = await submitAddOwner({ newOwner: accounts[9] });
@@ -320,7 +320,7 @@ contract('MultiSigWallet', accounts => {
       });
     });
 
-    it('should revert for not confirmed transaction', async () => {
+    it('should revert when transaction is not confirmed', async () => {
       await assertReverts(async () => {
         await wallet.executeTransaction(transactionId, { from: owners[2] });
       });
@@ -330,7 +330,7 @@ contract('MultiSigWallet', accounts => {
   describe('#changeRequirement', () => {
     const newRequired = 2;
 
-    it('should emit ExecutionFailureEvent for zero requirements', async () => {
+    it('should emit ExecutionFailure for zero requirements', async () => {
       const result = await executeChangeRequirements(0);
       const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
       assert.isOk(log);
@@ -339,7 +339,7 @@ contract('MultiSigWallet', accounts => {
       assertNumberEqual(event.transactionId, result.transactionId);
     });
 
-    it('should emit ExecutionFailureEvent for requirements > owners count', async () => {
+    it('should emit ExecutionFailure for too high requirement', async () => {
       const result = await executeChangeRequirements(4);
       const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
       assert.isOk(log);
@@ -348,7 +348,7 @@ contract('MultiSigWallet', accounts => {
       assertNumberEqual(event.transactionId, result.transactionId);
     });
 
-    it('should emit RequirementChangeEvent', async () => {
+    it('should emit RequirementChange', async () => {
       const result = await executeChangeRequirements(newRequired);
       const log = findLastLog(result.lastTransaction, 'RequirementChange');
       assert.isOk(log);
@@ -357,12 +357,12 @@ contract('MultiSigWallet', accounts => {
       assertNumberEqual(event.required, newRequired);
     });
 
-    it('should change `required` attribute', async () => {
+    it('should change required attribute', async () => {
       await executeChangeRequirements(newRequired);
       assertNumberEqual(await wallet.required(), newRequired);
     });
 
-    it('should revert for not wallet', async () => {
+    it('should revert for non-wallet', async () => {
       await assertReverts(async () => {
         await wallet.changeRequirement(newRequired);
       });
@@ -373,7 +373,7 @@ contract('MultiSigWallet', accounts => {
     const oldOwner = owners[0];
     const newOwner = accounts[4];
 
-    it('should emit ExecutionFailureEvent for non-owner', async () => {
+    it('should emit ExecutionFailure for non-owner', async () => {
       const result = await executeReplaceOwner(newOwner, newOwner);
       const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
       assert.isOk(log);
@@ -382,7 +382,7 @@ contract('MultiSigWallet', accounts => {
       assertNumberEqual(event.transactionId, result.transactionId);
     });
 
-    it('should emit ExecutionFailureEvent for existing new owner', async () => {
+    it('should emit ExecutionFailure for same new owner', async () => {
       const result = await executeReplaceOwner(oldOwner, oldOwner);
       const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
       assert.isOk(log);
@@ -425,7 +425,7 @@ contract('MultiSigWallet', accounts => {
       ]);
     });
 
-    it('should revert for not wallet', async () => {
+    it('should revert for non-wallet', async () => {
       await assertReverts(async () => {
         await wallet.replaceOwner(oldOwner, newOwner);
       });
@@ -435,7 +435,7 @@ contract('MultiSigWallet', accounts => {
   describe('#removeOwner', () => {
     const ownerToRemove = owners[1];
 
-    it('should emit ExecutionFailureEvent for non-owner', async () => {
+    it('should emit ExecutionFailure for non-owner', async () => {
       const result = await executeRemoveOwner(accounts[4]);
       const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
       assert.isOk(log);
@@ -459,7 +459,7 @@ contract('MultiSigWallet', accounts => {
       assert.notInclude(await wallet.getOwners(), ownerToRemove);
     });
 
-    it('should revert for not wallet', async () => {
+    it('should revert for non-wallet', async () => {
       await assertReverts(async () => {
         await wallet.removeOwner(ownerToRemove);
       });
@@ -469,7 +469,7 @@ contract('MultiSigWallet', accounts => {
   describe('#addOwner', () => {
     const newOwner = accounts[4];
 
-    it('should emit ExecutionFailureEvent for invalid address', async () => {
+    it('should emit ExecutionFailure for invalid address', async () => {
       const result = await executeAddOwner('0x0');
       const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
       assert.isOk(log);
@@ -478,7 +478,7 @@ contract('MultiSigWallet', accounts => {
       assertNumberEqual(event.transactionId, result.transactionId);
     });
 
-    it('should emit ExecutionFailureEvent for existing new owner', async () => {
+    it('should emit ExecutionFailure for existing new owner', async () => {
       const result = await executeAddOwner(owners[0]);
       const log = findLastLog(result.lastTransaction, 'ExecutionFailure');
       assert.isOk(log);
@@ -507,7 +507,7 @@ contract('MultiSigWallet', accounts => {
       ]);
     });
 
-    it('should revert for not wallet', async () => {
+    it('should revert for non-wallet', async () => {
       await assertReverts(async () => {
         await wallet.addOwner(newOwner);
       });

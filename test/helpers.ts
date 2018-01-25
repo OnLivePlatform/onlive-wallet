@@ -1,6 +1,6 @@
 import * as Web3 from 'web3';
 
-import BigNumber from 'bignumber.js';
+import { BigNumber } from 'bignumber.js';
 import { assert } from 'chai';
 import { findLast, propEq } from 'ramda';
 import {
@@ -39,8 +39,8 @@ export function assertRevertError(error: { message: string }) {
 }
 
 export function assertNumberEqual(
-  actual: Web3.AnyNumber,
-  expect: Web3.AnyNumber,
+  actual: AnyNumber,
+  expect: AnyNumber,
   decimals: number = 0
 ) {
   const actualNum = new BigNumber(actual);
@@ -80,14 +80,14 @@ export function findLastTransactionId(tx: TransactionResult) {
 }
 
 export interface ExecutionResult {
-  transactionId: AnyNumber;
+  transactionId: BigNumber;
   lastTransaction: TransactionResult;
 }
 
 export async function executeFunction(
   wallet: MultiSigWallet,
   to: Address,
-  value: Web3.AnyNumber,
+  value: AnyNumber,
   data: string,
   options: TransactionOptions
 ): Promise<ExecutionResult> {
