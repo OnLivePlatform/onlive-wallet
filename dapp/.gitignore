@@ -1,0 +1,2 @@
+Exception for dapp *.js files
+!./**/*.js
