@@ -104,14 +104,6 @@
         });
       };
 
-      $scope.getNonce = function () {
-        $uibModal.open({
-          templateUrl: 'partials/modals/showNonce.html',
-          size: 'md',
-          controller: 'nonceCtrl'
-        });
-      };
-
       /**
       * Returns the transaction or contract address
       */
