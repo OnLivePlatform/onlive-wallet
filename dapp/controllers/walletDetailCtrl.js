@@ -30,8 +30,11 @@
                     
           Object.assign(walletCopy, $scope.wallet);
           $scope.wallet = walletCopy;
-          
-          $scope.totalTokens = Object.keys($scope.wallet.tokens).length;
+
+          if ($scope.wallet.tokens) {
+              $scope.totalTokens = Object.keys($scope.wallet.tokens).length;
+          }
+          else $scope.wallet.tokens = 0
         }
       );
       // Get wallet balance, nonce, transactions, owners
@@ -172,6 +175,9 @@
                   token,
                   Web3Service.coinbase,
                   function (e, balance) {
+                    if (!$scope.userTokens[token]) {
+                        $scope.userTokens[token] = $scope.wallet.tokens[token]
+                    }
                     $scope.userTokens[token].balance = balance;
                     Wallet.triggerUpdates();
                   }
