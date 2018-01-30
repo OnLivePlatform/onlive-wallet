@@ -106,18 +106,6 @@
               )
             );
 
-            $scope.batch.add(
-              Wallet.calcMaxWithdraw(
-                address,
-                function (e, max) {
-                  if(!e && max && $scope.wallets[address]){
-                    $scope.$apply(function () {
-                      $scope.wallets[address].maxWithdraw = max;
-                    });
-                  }
-                }
-              )
-            );
           });
           $scope.batch.execute();
         }
@@ -171,8 +159,6 @@
                   Utils.dangerAlert(e);
                 }
                 else {
-                  // Add default tokens to wallet
-                  Token.setDefaultTokens($scope.old.address);
                   $uibModalInstance.close();
                 }
               });

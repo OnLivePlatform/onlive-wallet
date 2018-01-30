@@ -870,18 +870,6 @@
       };
 
       /**
-      *
-      **/
-      wallet.calcMaxWithdraw = function (address, cb) {
-        var instance = Web3Service.web3.eth.contract(wallet.json.multiSigDailyLimit.abi).at(address);
-        return wallet.callRequest(
-          instance.calcMaxWithdraw,
-          [],
-          cb
-        );
-      };
-
-      /**
       * Confirm transaction by another wallet owner
       */
       wallet.confirmTransaction = function (address, txId, options, cb) {
