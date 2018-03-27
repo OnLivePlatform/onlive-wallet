@@ -71,7 +71,7 @@
   "devDependencies": {
     "babel-register": "^6.24.0",
     "coffee-script": "^1.12.7",
-    "electron": "~1.4.13",
+    "electron": "1.8.4",
     "electron-builder": "^17.1.0",
     "electron-packager": "^8.6.0",
     "electron-rebuild": "^1.5.7",
