@@ -1,4 +1,4 @@
-pragma solidity 0.4.18;
+pragma solidity 0.4.24;
 
 
 /**
@@ -98,7 +98,7 @@ contract MultiSigWallet {
      * @param _owners List of initial owners
      * @param _required Number of required confirmations
      */
-    function MultiSigWallet(address[] _owners, uint256 _required)
+    constructor(address[] _owners, uint256 _required)
         public
         onlyValidRequirement(_owners.length, _required)
     {
@@ -117,7 +117,7 @@ contract MultiSigWallet {
      */
     function() public payable {
         if (msg.value > 0) {
-            Deposit(msg.sender, msg.value);
+            emit Deposit(msg.sender, msg.value);
         }
     }
 
@@ -136,7 +136,7 @@ contract MultiSigWallet {
         isOwner[owner] = true;
         owners.push(owner);
 
-        OwnerAddition(owner);
+        emit OwnerAddition(owner);
     }
 
     /**
@@ -163,7 +163,7 @@ contract MultiSigWallet {
             changeRequirement(owners.length);
         }
 
-        OwnerRemoval(owner);
+        emit OwnerRemoval(owner);
     }
 
     /**
@@ -188,8 +188,8 @@ contract MultiSigWallet {
         isOwner[owner] = false;
         isOwner[newOwner] = true;
 
-        OwnerRemoval(owner);
-        OwnerAddition(newOwner);
+        emit OwnerRemoval(owner);
+        emit OwnerAddition(newOwner);
     }
 
     /**
@@ -203,7 +203,7 @@ contract MultiSigWallet {
         onlyValidRequirement(owners.length, _required)
     {
         required = _required;
-        RequirementChange(_required);
+        emit RequirementChange(_required);
     }
 
     /**
@@ -234,7 +234,7 @@ contract MultiSigWallet {
         onlyNotConfirmed(transactionId, msg.sender)
     {
         confirmations[transactionId][msg.sender] = true;
-        Confirmation(msg.sender, transactionId);
+        emit Confirmation(msg.sender, transactionId);
 
         executeTransaction(transactionId);
     }
@@ -250,7 +250,7 @@ contract MultiSigWallet {
         onlyNotExecuted(transactionId)
     {
         confirmations[transactionId][msg.sender] = false;
-        Revocation(msg.sender, transactionId);
+        emit Revocation(msg.sender, transactionId);
     }
 
     /**
@@ -269,9 +269,9 @@ contract MultiSigWallet {
 
             /* solhint-disable avoid-call-value */
             if (txn.destination.call.value(txn.value)(txn.data)) {
-                Execution(transactionId);
+                emit Execution(transactionId);
             } else {
-                ExecutionFailure(transactionId);
+                emit ExecutionFailure(transactionId);
                 txn.executed = false;
             }
             /* solhint-enable avoid-call-value */
@@ -434,6 +434,6 @@ contract MultiSigWallet {
         });
         transactionCount += 1;
 
-        Submission(transactionId);
+        emit Submission(transactionId);
     }
 }

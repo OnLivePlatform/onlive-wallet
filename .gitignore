@@ -1,5 +1,8 @@
-# Compiled JS
-*.js
+# Compiled TypeScript
+migrations/*.js
+test/*.js
+truffle-config.js
+utils/*.js
 
 # Logs
 logs
