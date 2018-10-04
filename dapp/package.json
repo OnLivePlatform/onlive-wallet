@@ -70,7 +70,7 @@
   "devDependencies": {
     "babel-register": "^6.24.0",
     "coffee-script": "^1.12.7",
-    "electron": "1.8.4",
+    "electron": "^1.8.8",
     "electron-builder": "^20.28.4",
     "electron-packager": "^8.6.0",
     "electron-rebuild": "^1.5.7",
